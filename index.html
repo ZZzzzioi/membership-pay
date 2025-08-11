@@ -1,0 +1,62 @@
+<!doctype html>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>会员付款金额计算</title>
+<style>
+  body{background:#0b0b0b;color:#eee;font-family:ui-sans-serif,-apple-system,Segoe UI,Roboto,Arial,"PingFang SC","Noto Sans CJK SC","Microsoft YaHei",sans-serif}
+  .wrap{max-width:760px;margin:48px auto;padding:0 16px}
+  .card{background:#111;border:1px solid #2a2a2a;border-radius:16px;padding:20px;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+  h1{font-size:22px;margin:0 0 10px} p{color:#aaa;margin:8px 0;line-height:1.6}
+  label{display:block;margin-top:8px;color:#cfcfcf} input{width:100%;margin:6px 0 14px;padding:14px 12px;font-size:16px;color:#eee;background:#0e0e0e;border:1px solid #2a2a2a;border-radius:12px}
+  input:focus{outline:none;border-color:#4f46e5} code{background:#0e0e0e;border:1px solid #2a2a2a;padding:3px 8px;border-radius:8px}
+  .row{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
+  .btn{appearance:none;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:12px 14px;border-radius:12px;border:1px solid #2a2a2a;color:#eee;background:#151515}
+  .primary{background:#4f46e5;border-color:#4f46e5}
+  .mono{font-family:ui-monospace,Menlo,Consolas,monospace;letter-spacing:.2px}
+  .hint{font-size:13px;color:#9a9a9a;margin-top:8px}
+</style>
+<div class="wrap"><div class="card">
+  <h1>会员付款金额计算</h1>
+  <p>规则：金额为 <span class="mono">1.0000000000ABCDEFGH ETH</span>，其中最后 8 位来自你的 <span class="mono">handle</span>。</p>
+  <label>社交 Handle（如 <span class="mono">@alice</span> 或 <span class="mono">alice</span>）</label>
+  <input id="handle" placeholder="@your_handle" autocomplete="off" />
+  <div id="out" style="display:none">
+    <p>识别码（末 8 位）：<code id="code8" class="mono"></code></p>
+    <p>应付金额（ETH）：<code id="amount" class="mono"></code></p>
+    <p>收款地址：<code id="receiver" class="mono"></code></p>
+    <div class="row">
+      <a id="pay" class="btn primary" target="_blank" rel="noopener">一键打开钱包付款</a>
+      <a id="form" class="btn" target="_blank" rel="noopener">去提交交易哈希</a>
+    </div>
+    <div class="hint">※ 金额必须精确到 <span class="mono">wei</span>（最后 8 位）；建议使用自托管钱包。</div>
+  </div>
+</div></div>
+<script>
+  // === 配置项：把下面三处改成你的值 ===
+  const RECEIVER = "0xYourReceiveAddress";                          // ① 收款地址
+  const GOOGLE_FORM_BASE = "https://docs.google.com/forms/d/e/1FAIpQLSeg8OmXGTEB3t1-Dz44lKp-IQG2slsEpminwfWGf4aB7h-Kaw/viewform?usp=pp_url&entry.621460121=ZZzzzioi_"; // ② 你的表单“预填链接”基础地址
+  const ENTRY_HANDLE = "entry.621460121";                            // ③ Handle 的 entry id
+  // =====================================
+
+  const $h=document.getElementById('handle'),$out=document.getElementById('out'),
+        $code8=document.getElementById('code8'),$amount=document.getElementById('amount'),
+        $rcv=document.getElementById('receiver'),$pay=document.getElementById('pay'),
+        $form=document.getElementById('form');
+
+  const normalize=h=>{h=(h||'').trim();if(h.startsWith('@'))h=h.slice(1);return h.toLowerCase()};
+  async function sha256Hex(s){const b=new TextEncoder().encode(s);
+    const d=await crypto.subtle.digest('SHA-256',b);
+    return [...new Uint8Array(d)].map(x=>x.toString(16).padStart(2,'0')).join('')}
+  const amountStr = code8 => `1.0000000000${code8}`;
+  const weiFrom = code8 => (10n**18n + BigInt(code8)).toString();
+
+  async function render(){
+    const h=normalize($h.value); if(!h){$out.style.display='none';return;}
+    const hex=await sha256Hex(h); const n=parseInt(hex.slice(0,12),16)%100000000;
+    const code8=n.toString().padStart(8,'0'); const amt=amountStr(code8); const wei=weiFrom(code8);
+    $out.style.display=''; $code8.textContent=code8; $amount.textContent=amt; $rcv.textContent=RECEIVER;
+    $pay.href=`ethereum:${RECEIVER}?value=${wei}`;
+    const u=new URL(GOOGLE_FORM_BASE); u.searchParams.set(ENTRY_HANDLE,h); $form.href=u.toString();
+  }
+  $h.addEventListener('input',render);
+</script>
