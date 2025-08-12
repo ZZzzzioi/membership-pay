@@ -1,104 +1,176 @@
 <!doctype html>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>会员付款金额计算</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>会员付款 · 测试网（Sepolia）</title>
 <style>
-  body{background:#0b0b0b;color:#eee;font-family:ui-sans-serif,-apple-system,Segoe UI,Roboto,Arial,"PingFang SC","Noto Sans CJK SC","Microsoft YaHei",sans-serif}
+  body{background:#0b0b0b;color:#eee;font-family:ui-sans-serif,-apple-system,Segoe UI,Roboto,Arial,"PingFang SC","Microsoft YaHei",sans-serif}
   .wrap{max-width:760px;margin:48px auto;padding:0 16px}
-  .card{background:#111;border:1px solid #2a2a2a;border-radius:16px;padding:20px;box-shadow:0 10px 30px rgba(0,0,0,.35)}
-  h1{font-size:22px;margin:0 0 10px} p{color:#aaa;margin:8px 0;line-height:1.6}
-  label{display:block;margin-top:8px;color:#cfcfcf} input{width:100%;margin:6px 0 14px;padding:14px 12px;font-size:16px;color:#eee;background:#0e0e0e;border:1px solid #2a2a2a;border-radius:12px}
-  input:focus{outline:none;border-color:#4f46e5} code{background:#0e0e0e;border:1px solid #2a2a2a;padding:3px 8px;border-radius:8px}
-  .row{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
-  .btn{appearance:none;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:12px 14px;border-radius:12px;border:1px solid #2a2a2a;color:#eee;background:#151515;cursor:pointer}
-  .primary{background:#4f46e5;border-color:#4f46e5}
-  .mono{font-family:ui-monospace,Menlo,Consolas,monospace;letter-spacing:.2px}
-  .hint{font-size:13px;color:#9a9a9a;margin-top:8px}
-  .center { display:flex; justify-content:center; margin-top:14px; }
-  .btn.large { padding:14px 22px; font-size:18px; }
+  .card{background:#111;border:1px solid #2a2a2a;border-radius:16px;padding:20px}
+  .row{display:flex;gap:10px;flex-wrap:wrap}
+  input{width:100%;padding:12px;border-radius:12px;border:1px solid #2a2a2a;background:#0e0e0e;color:#eee;font-size:16px}
+  button{padding:12px 14px;border-radius:12px;border:1px solid #2a2a2a;background:#151515;color:#eee;cursor:pointer}
+  button.primary{background:#4f46e5;border-color:#4f46e5}
+  .mono{font-family:ui-monospace,Menlo,Consolas,monospace}
+  .muted{color:#9a9a9a;font-size:13px}
+  .mt{margin-top:12px}
 </style>
 
-<div class="wrap"><div class="card">
-  <h1>会员付款金额计算</h1>
-  <p>规则：金额为 <span class="mono">1.0000000000ABCDEFGH ETH</span>，其中最后 8 位来自你的 <span class="mono">handle</span>。</p>
-  <label>社交 Handle（如 <span class="mono">@alice</span> 或 <span class="mono">alice</span>）</label>
-  <input id="handle" placeholder="@your_handle" autocomplete="off" />
+<div class="wrap">
+  <div class="card">
+    <h2>会员付款（连接钱包·测试网）</h2>
+    <p class="muted">规则：金额 = <span class="mono">1.0000000000ABCDEFGH ETH</span>，其中最后 8 位由你的 handle 计算。<br>
+    <b>当前为测试模式：</b>实际发送值 = <span class="mono"> code8 wei </span>（方便核对）。</p>
 
-  <div id="out" style="display:none">
-    <p>识别码（末 8 位）：<code id="code8" class="mono"></code></p>
-    <p>应付金额（ETH）：<code id="amount" class="mono"></code></p>
-    <p>收款地址：<code id="receiver" class="mono"></code></p>
+    <label>社交 handle</label>
+    <input id="handle" placeholder="@your_handle" autocomplete="off">
 
-    <div class="row">
-      <button id="copyAmount" class="btn primary">复制金额</button>
-      <button id="copyAddr" class="btn">复制地址</button>
+    <div class="mt">
+      <div>识别码（末8位）：<span id="code8" class="mono">——</span></div>
+      <div>应付金额（展示）：<span id="amountShown" class="mono">——</span> <span class="muted">(显示值=1.0000000000+code8；实际发送会 -1 wei)</span></div>
+      <div>实际发送（wei→ETH）：<span id="amountReal" class="mono">——</span></div>
+      <div>收款地址（Sepolia）：<span id="receiver" class="mono"></span></div>
+      <div>目标网络：<span class="mono">Sepolia (chainId 11155111)</span></div>
     </div>
 
-    <div class="center">
-      <a id="form" class="btn large" target="_blank" rel="noopener">提交交易哈希</a>
+    <div class="row mt">
+      <button id="btnConnect">连接钱包</button>
+      <button id="btnPay" class="primary" disabled>发起转账（测试）</button>
     </div>
 
-    <div class="hint">※ 金额必须精确到 <span class="mono">wei</span>（最后 8 位）；建议使用自托管钱包。</div>
+    <div id="status" class="muted mt"></div>
   </div>
-</div></div>
+</div>
 
 <script>
-  // === 配置项：把下面三处改成你的值 ===
-  const RECEIVER = "0x2BfC6050869b0F6Dc17C853827D694838E62cF6a"; // 收款地址
-  const GOOGLE_FORM_BASE = "https://docs.google.com/forms/d/e/1FAIpQLSeg8OmXGTEB3t1-Dz44lKp-IQG2slsEpminwfWGf4aB7h-Kaw/viewform?usp=pp_url";
-  const ENTRY_HANDLE = "entry.621460121";
-  // =====================================
+/** ===== 配置区：替换成你的值 ===== */
+const RECEIVER = "0x7722a8853e29290381D7d28fB244Fe7A01d392E9"; // 你的收款地址（请用 Sepolia 上的地址）
+const CHAIN_ID_DEC = 11155111;                                   // Sepolia 测试网
+// 记录到 Google 表单（可选）——把下面三个 entry id 改成你表单里的
+const FORM_ACTION = "https://docs.google.com/forms/d/e/1FAIpQLSeg8OmXGTEB3t1-Dz44lKp-IQG2slsEpminwfWGf4aB7h-Kaw/formResponse";
+const ENTRY_HANDLE = "entry.621460121";
+const ENTRY_TX     = "entry.755937546";   // ← 你的 “txhash” 字段 entry id
+const ENTRY_ADDR   = "entry.147467557";   // ← 你的 “钱包地址” 字段 entry id
+/** ================================= */
 
-  const $h = document.getElementById('handle');
-  const $out = document.getElementById('out');
-  const $code8 = document.getElementById('code8');
-  const $amount = document.getElementById('amount');
-  const $rcv = document.getElementById('receiver');
-  const $form = document.getElementById('form');
-  const $copyAmount = document.getElementById('copyAmount');
-  const $copyAddr = document.getElementById('copyAddr');
+const $h = document.getElementById('handle');
+const $code8 = document.getElementById('code8');
+const $amountShown = document.getElementById('amountShown');
+const $amountReal = document.getElementById('amountReal');
+const $rcv = document.getElementById('receiver');
+const $btnC = document.getElementById('btnConnect');
+const $btnP = document.getElementById('btnPay');
+const $status = document.getElementById('status');
 
-  const normalize = h => { h = (h || '').trim(); if (h.startsWith('@')) h = h.slice(1); return h.toLowerCase(); };
-  async function sha256Hex(s) {
-    const b = new TextEncoder().encode(s);
-    const d = await crypto.subtle.digest('SHA-256', b);
-    return [...new Uint8Array(d)].map(x => x.toString(16).padStart(2, '0')).join('');
+$rcv.textContent = RECEIVER;
+
+const normalize = (s) => {
+  s = (s||"").trim();
+  if (s.startsWith("@")) s = s.slice(1);
+  return s.toLowerCase();
+};
+async function sha256Hex(s){
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
+  return [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,"0")).join("");
+}
+const amountShownStr = (code8) => `1.0000000000${code8}`;
+
+// 把 BigInt wei 格式化成人可读 ETH 字符串（18位小数）
+function formatEthFromWei(wei){
+  const base = 10n ** 18n;
+  const whole = (wei / base).toString();
+  let frac = (wei % base).toString().padStart(18, "0");
+  // 去掉尾部多余0但保留至少1位
+  frac = frac.replace(/0+$/,'') || '0';
+  return `${whole}.${frac}`;
+}
+
+async function refresh(){
+  const h = normalize($h.value);
+  if(!h){ 
+    $code8.textContent="——"; 
+    $amountShown.textContent="——";
+    $amountReal.textContent="——";
+    $btnP.disabled = true; 
+    return; 
   }
-  const amountStr = code8 => `1.0000000000${code8}`;
+  const hex = await sha256Hex(h);
+  const n = parseInt(hex.slice(0,12),16) % 100000000;
+  const code8 = n.toString().padStart(8,"0");
+  const weiReal = BigInt(code8); // 现在：只发 code8 wei
+  $code8.textContent = code8;
+  $amountShown.textContent = amountShownStr(code8);
+  $amountReal.textContent = formatEthFromWei(weiReal) + " ETH";
+  $btnP.disabled = false;
+}
+$h.addEventListener('input', refresh);
 
-  async function render() {
-    const h = normalize($h.value);
-    if (!h) { $out.style.display = 'none'; return; }
-
-    const hex = await sha256Hex(h);
-    const n = parseInt(hex.slice(0, 12), 16) % 100000000;
-    const code8 = n.toString().padStart(8, '0');
-    const amt = amountStr(code8);
-
-    $out.style.display = '';
-    $code8.textContent = code8;
-    $amount.textContent = amt;
-    $rcv.textContent = RECEIVER;
-
-    const u = new URL(GOOGLE_FORM_BASE);
-    u.searchParams.set(ENTRY_HANDLE, h);
-    $form.href = u.toString();
+// 连接钱包 & 切换网络（Sepolia）
+async function ensureWallet(){
+  if (!window.ethereum) throw new Error("未检测到浏览器钱包（MetaMask/Rabby等）");
+  const accounts = await ethereum.request({ method: "eth_requestAccounts" });
+  const from = accounts[0];
+  const chainIdHex = await ethereum.request({ method: "eth_chainId" });
+  const cur = parseInt(chainIdHex, 16);
+  if (cur !== CHAIN_ID_DEC){
+    try{
+      await ethereum.request({
+        method: "wallet_switchEthereumChain",
+        params: [{ chainId: "0x" + CHAIN_ID_DEC.toString(16) }]
+      });
+    }catch(e){
+      throw new Error("请切换到 Sepolia 测试网后重试");
+    }
   }
+  return from;
+}
 
-  // 复制按钮事件
-  $copyAmount.onclick = async () => {
-    await navigator.clipboard.writeText($amount.textContent);
-    $copyAmount.textContent = "已复制金额";
-    setTimeout(() => $copyAmount.textContent = "复制金额", 1200);
-  };
-  $copyAddr.onclick = async () => {
-    await navigator.clipboard.writeText(RECEIVER);
-    $copyAddr.textContent = "已复制地址";
-    setTimeout(() => $copyAddr.textContent = "复制地址", 1200);
-  };
+$btnC.onclick = async () => {
+  try {
+    const addr = await ensureWallet();
+    $status.textContent = "已连接：" + addr + "（Sepolia）";
+  } catch (e){ $status.textContent = "连接失败：" + (e.message||e); }
+};
 
-  $h.addEventListener('input', render);
+$btnP.onclick = async () => {
+  try{
+    const handle = normalize($h.value);
+    if (!handle) throw new Error("请先填写 handle");
+    const from = await ensureWallet();
+
+    // 重新计算金额（避免用户输入变化）
+    const hex = await sha256Hex(handle);
+    const n = parseInt(hex.slice(0,12),16) % 100000000;
+    const code8 = n.toString().padStart(8,"0");
+    const weiDec = BigInt(code8);
+    const weiHex = "0x" + weiDec.toString(16);
+
+    $status.textContent = "正在发起交易，请在钱包中确认…";
+    const txHash = await ethereum.request({
+      method: "eth_sendTransaction",
+      params: [{ from, to: RECEIVER, value: weiHex }]
+    });
+
+    $status.textContent = "已提交（Sepolia），等待上链… tx: " + txHash;
+
+    // 记录到 Google 表单（可选）
+    try{
+      await fetch(FORM_ACTION, {
+        method: "POST",
+        mode: "no-cors",
+        headers: { "Content-Type":"application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          [ENTRY_HANDLE]: handle,
+          [ENTRY_TX]: txHash,
+          [ENTRY_ADDR]: from
+        })
+      });
+      $status.textContent = "交易已提交并记录（测试网）。tx: " + txHash;
+    }catch(e){
+      $status.textContent = "交易成功，但记录失败，请手动保存 txHash。";
+    }
+  }catch(e){
+    $status.textContent = "失败：" + (e.message || e);
+  }
+};
 </script>
-
-
 
